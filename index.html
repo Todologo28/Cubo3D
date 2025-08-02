@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cubo 3D con Transformaciones</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        #canvas {
+            border: 3px solid #fff;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            background: #1a1a1a;
+        }
+
+        .controles {
+            margin-top: 20px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .control-grupo {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .control-grupo label {
+            color: white;
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .control-grupo input {
+            width: 120px;
+            padding: 5px;
+            border-radius: 5px;
+            border: none;
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .info {
+            margin-top: 15px;
+            color: rgba(255,255,255,0.8);
+            text-align: center;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+<h1> Cubo 3D con Transformaciones</h1>
+<canvas id="canvas" width="800" height="600"></canvas>
+
+<div class="controles">
+    <div class="control-grupo">
+        <label>Rotación Y (grados):</label>
+        <input type="range" id="rotacion" min="0" max="360" value="0">
+        <span id="rotValue">0°</span>
+    </div>
+
+    <div class="control-grupo">
+        <label>Escala:</label>
+        <input type="range" id="escala" min="0.5" max="3" step="0.1" value="1">
+        <span id="scaleValue">1.0x</span>
+    </div>
+
+    <div class="control-grupo">
+        <label>Traslación X:</label>
+        <input type="range" id="traslacionX" min="-200" max="200" value="0">
+        <span id="transXValue">0</span>
+    </div>
+
+    <div class="control-grupo">
+        <label>Traslación Y:</label>
+        <input type="range" id="traslacionY" min="-150" max="150" value="0">
+        <span id="transYValue">0</span>
+    </div>
+</div>
+
+<div class="info">
+    <p>🎮 Usa los controles para transformar el cubo en tiempo real</p>
+</div>
+
+<script>
+    // ========================================
+    // CONFIGURACIÓN INICIAL DEL CANVAS
+    // ========================================
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Centro del canvas para las transformaciones
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    // ========================================
+    // DEFINICIÓN DEL CUBO 3D
+    // ========================================
+
+    /**
+     * Vértices del cubo en coordenadas 3D
+     * Un cubo centrado en el origen con lado de 100 unidades
+     */
+    const vertices3D = [
+        // Cara frontal
+        [-50, -50, 50],   // 0: inferior izquierda frontal
+        [50, -50, 50],    // 1: inferior derecha frontal
+        [50, 50, 50],     // 2: superior derecha frontal
+        [-50, 50, 50],    // 3: superior izquierda frontal
+
+        // Cara trasera
+        [-50, -50, -50],  // 4: inferior izquierda trasera
+        [50, -50, -50],   // 5: inferior derecha trasera
+        [50, 50, -50],    // 6: superior derecha trasera
+        [-50, 50, -50]    // 7: superior izquierda trasera
+    ];
+
+    /**
+     * Definición de las aristas del cubo
+     * Cada arista conecta dos vértices por sus índices
+     */
+    const aristas = [
+        // Cara frontal
+        [0, 1], [1, 2], [2, 3], [3, 0],
+        // Cara trasera
+        [4, 5], [5, 6], [6, 7], [7, 4],
+        // Conexiones entre caras
+        [0, 4], [1, 5], [2, 6], [3, 7]
+    ];
+
+    // ========================================
+    // FUNCIONES DE TRANSFORMACIÓN 3D
+    // ========================================
+
+    /**
+     * Aplica rotación alrededor del eje Y
+     * @param {Array} punto - Coordenadas [x, y, z]
+     * @param {number} angulo - Ángulo en radianes
+     * @returns {Array} Punto rotado [x, y, z]
+     */
+    function rotarY(punto, angulo) {
+        const [x, y, z] = punto;
+        const cos = Math.cos(angulo);
+        const sin = Math.sin(angulo);
+
+        return [
+            x * cos + z * sin,  // Nueva coordenada X
+            y,                  // Y no cambia en rotación Y
+            -x * sin + z * cos  // Nueva coordenada Z
+        ];
+    }
+
+    /**
+     * Aplica escala uniforme a un punto
+     * @param {Array} punto - Coordenadas [x, y, z]
+     * @param {number} factor - Factor de escala
+     * @returns {Array} Punto escalado [x, y, z]
+     */
+    function escalar(punto, factor) {
+        return [
+            punto[0] * factor,
+            punto[1] * factor,
+            punto[2] * factor
+        ];
+    }
+
+    /**
+     * Aplica traslación a un punto
+     * @param {Array} punto - Coordenadas [x, y, z]
+     * @param {number} dx - Desplazamiento en X
+     * @param {number} dy - Desplazamiento en Y
+     * @param {number} dz - Desplazamiento en Z
+     * @returns {Array} Punto trasladado [x, y, z]
+     */
+    function trasladar(punto, dx, dy, dz) {
+        return [
+            punto[0] + dx,
+            punto[1] + dy,
+            punto[2] + dz
+        ];
+    }
+
+    /**
+     * Proyecta un punto 3D a coordenadas 2D del canvas
+     * Usa proyección en perspectiva simple
+     * @param {Array} punto3D - Coordenadas [x, y, z]
+     * @returns {Array} Coordenadas 2D [x, y]
+     */
+    function proyectar3Da2D(punto3D) {
+        const [x, y, z] = punto3D;
+
+        // Factor de perspectiva (distancia del observador)
+        const distanciaObservador = 400;
+
+        // Proyección en perspectiva
+        const factor = distanciaObservador / (distanciaObservador + z);
+
+        return [
+            centerX + x * factor,  // X proyectada + centro del canvas
+            centerY - y * factor   // Y proyectada + centro del canvas (invertida)
+        ];
+    }
+
+    // ========================================
+    // FUNCIÓN PRINCIPAL DE RENDERIZADO
+    // ========================================
+
+    /**
+     * Dibuja el cubo completo con todas las transformaciones aplicadas
+     * @param {number} rotacionY - Ángulo de rotación en grados
+     * @param {number} escalaFactor - Factor de escala
+     * @param {number} transX - Traslación en X
+     * @param {number} transY - Traslación en Y
+     */
+    function dibujarCubo(rotacionY, escalaFactor, transX, transY) {
+        // Limpiar el canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Convertir rotación de grados a radianes
+        const anguloRadianes = (rotacionY * Math.PI) / 180;
+
+        // ========================================
+        // APLICAR TRANSFORMACIONES A TODOS LOS VÉRTICES
+        // ========================================
+        const verticesTransformados = vertices3D.map(vertice => {
+            // 1. Rotar alrededor del eje Y
+            let puntoRotado = rotarY(vertice, anguloRadianes);
+
+            // 2. Aplicar escala uniforme
+            let puntoEscalado = escalar(puntoRotado, escalaFactor);
+
+            // 3. Aplicar traslación
+            let puntoTrasladado = trasladar(puntoEscalado, transX, transY, 0);
+
+            // 4. Proyectar a 2D
+            return proyectar3Da2D(puntoTrasladado);
+        });
+
+        // ========================================
+        // DIBUJAR SUPERFICIE DE REFERENCIA
+        // ========================================
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+
+        // Líneas de cuadrícula para dar contexto 3D
+        for (let i = -300; i <= 300; i += 50) {
+            ctx.beginPath();
+            ctx.moveTo(centerX + i, centerY + 200);
+            ctx.lineTo(centerX + i, centerY + 300);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(centerX - 300, centerY + 200 + (i/5));
+            ctx.lineTo(centerX + 300, centerY + 200 + (i/5));
+            ctx.stroke();
+        }
+
+        ctx.setLineDash([]); // Restaurar línea sólida
+
+        // ========================================
+        // DIBUJAR ARISTAS DEL CUBO
+        // ========================================
+
+        // Configurar estilo de línea para el cubo
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#00ff88';
+        ctx.shadowBlur = 5;
+
+        // Dibujar cada arista
+        aristas.forEach(([indiceA, indiceB]) => {
+            const [x1, y1] = verticesTransformados[indiceA];
+            const [x2, y2] = verticesTransformados[indiceB];
+
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+        });
+
+        // ========================================
+        // DIBUJAR VÉRTICES
+        // ========================================
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#ff4757';
+
+        verticesTransformados.forEach(([x, y], indice) => {
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Etiquetas de vértices (opcional)
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '12px Arial';
+            ctx.fillText(indice.toString(), x + 8, y - 8);
+            ctx.fillStyle = '#ff4757';
+        });
+
+        // Restaurar configuración de sombra
+        ctx.shadowBlur = 0;
+    }
+
+    // ========================================
+    // SISTEMA DE CONTROLES INTERACTIVOS
+    // ========================================
+
+    // Referencias a los controles
+    const rotacionSlider = document.getElementById('rotacion');
+    const escalaSlider = document.getElementById('escala');
+    const traslacionXSlider = document.getElementById('traslacionX');
+    const traslacionYSlider = document.getElementById('traslacionY');
+
+    // Referencias a los displays de valores
+    const rotValue = document.getElementById('rotValue');
+    const scaleValue = document.getElementById('scaleValue');
+    const transXValue = document.getElementById('transXValue');
+    const transYValue = document.getElementById('transYValue');
+
+    /**
+     * Actualiza la visualización basada en los valores actuales de los controles
+     */
+    function actualizarVisualizacion() {
+        const rotacion = parseFloat(rotacionSlider.value);
+        const escala = parseFloat(escalaSlider.value);
+        const transX = parseFloat(traslacionXSlider.value);
+        const transY = parseFloat(traslacionYSlider.value);
+
+        // Actualizar displays de valores
+        rotValue.textContent = rotacion + '°';
+        scaleValue.textContent = escala.toFixed(1) + 'x';
+        transXValue.textContent = transX;
+        transYValue.textContent = transY;
+
+        // Redibujar el cubo con las nuevas transformaciones
+        dibujarCubo(rotacion, escala, transX, transY);
+    }
+
+    // Event listeners para los controles
+    rotacionSlider.addEventListener('input', actualizarVisualizacion);
+    escalaSlider.addEventListener('input', actualizarVisualizacion);
+    traslacionXSlider.addEventListener('input', actualizarVisualizacion);
+    traslacionYSlider.addEventListener('input', actualizarVisualizacion);
+
+    function loopAnimacion() {
+        if (animacionActiva) {
+            tiempoAnimacion += 0.02;
+
+            // Rotación automática suave
+            const rotacionAuto = (tiempoAnimacion * 30) % 360;
+            rotacionSlider.value = rotacionAuto;
+
+            actualizarVisualizacion();
+            requestAnimationFrame(loopAnimacion);
+        }
+    }
+
+    // Activar/desactivar animación con doble clic
+    canvas.addEventListener('dblclick', () => {
+        animacionActiva = !animacionActiva;
+        if (animacionActiva) {
+            loopAnimacion();
+        }
+    });
+
+    // ========================================
+    // INICIALIZACIÓN
+    // ========================================
+
+    // Dibujar el cubo inicial
+    actualizarVisualizacion();
+
+    // Mensaje de instrucciones
+    console.log(' Cubo 3D cargado exitosamente!');
+    console.log(' Controles disponibles:');
+    console.log('   • Sliders: Transformaciones manuales');
+    console.log('   • Doble clic: Activar/desactivar rotación automática');
+</script>
+</body>
+</html>
