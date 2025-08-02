@@ -108,7 +108,7 @@
     // ========================================
     // CONFIGURACIÓN INICIAL DEL CANVAS
     // ========================================
-    const canvas = document.getElementById('canvas');+
+    const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
 
     // Centro del canvas para las transformaciones
@@ -155,7 +155,7 @@
     // ========================================
 
     /**
-     * Aplicación de  rotación alrededor del eje Y
+     * Aplica rotación alrededor del eje Y
      * @param {Array} punto - Coordenadas [x, y, z]
      * @param {number} angulo - Ángulo en radianes
      * @returns {Array} Punto rotado [x, y, z]
@@ -173,7 +173,7 @@
     }
 
     /**
-     * Aplicación de  escala uniforme a un punto
+     * Aplica escala uniforme a un punto
      * @param {Array} punto - Coordenadas [x, y, z]
      * @param {number} factor - Factor de escala
      * @returns {Array} Punto escalado [x, y, z]
@@ -187,7 +187,7 @@
     }
 
     /**
-     * Aplicación de  traslación a un punto
+     * Aplica traslación a un punto
      * @param {Array} punto - Coordenadas [x, y, z]
      * @param {number} dx - Desplazamiento en X
      * @param {number} dy - Desplazamiento en Y
@@ -364,6 +364,16 @@
     traslacionXSlider.addEventListener('input', actualizarVisualizacion);
     traslacionYSlider.addEventListener('input', actualizarVisualizacion);
 
+    // ========================================
+    // ANIMACIÓN AUTOMÁTICA (OPCIONAL)
+    // ========================================
+
+    let animacionActiva = false;
+    let tiempoAnimacion = 0;
+
+    /**
+     * Loop de animación automática
+     */
     function loopAnimacion() {
         if (animacionActiva) {
             tiempoAnimacion += 0.02;
